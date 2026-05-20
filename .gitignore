@@ -1,0 +1,10 @@
+# Compiled executables
+client
+server
+test_server
+
+# Object files
+*.o
+
+# macOS system files
+.DS_Store

@@ -1,0 +1,192 @@
+FileSync - Client-Server File Synchronization System
+
+
+Project Description
+FileSync is a client-server based file synchronization system implemented in C using TCP sockets. Our project allows multiple clients to push and pull files from a centralized server while preventing conflicting edits through a file-locking mechanism.
+
+When a client pulls a file, the server temporarily locks that file so that no other client can pull it until the original client either pushes the updated version back to the server or releases the lock using the done command.
+
+The system also supports uploading new files from a client to the server. For files that already exist on the server, the client must first pull and lock the file before pushing an updated version back.
+
+This project demonstrates several systems programming concepts including:
+
+* Socket programming
+* File I/O
+* Client-server communication
+* File synchronization
+* Metadata and locking mechanisms
+* TCP networking in C
+
+
+
+Features
+
+- Push new files from client to server
+- Push updated files back to the server after locking
+- Pull files from server to client
+- Upload/download file transfer
+- File-locking support
+- File status checking
+- Lock release using the done command
+- Error handling
+- TCP socket communication
+- Command-based interface
+
+
+Project Structure
+
+file_sync/
+│
+├── client.c
+├── server.c
+├── common.h
+├── Makefile
+├── README.md
+│
+├── client_files/
+├── server_files/
+
+
+
+Build Instructions
+
+
+To compile the project, run:     
+
+make
+
+To remove compiled executables, run:
+
+make clean
+
+If compiling manually, use:
+
+gcc -Wall -Wextra -pedantic -std=c11 -D_POSIX_C_SOURCE=200112L server.c -o server
+gcc -Wall -Wextra -pedantic -std=c11 -D_POSIX_C_SOURCE=200112L client.c -o client
+	
+
+
+
+Run Instructions
+
+First, start the server by providing a port number:
+
+./server 8080
+
+Then in another terminal, run the client using one of the supported commands.
+
+Client command format:
+
+./client <server_ip> <port> <client_id> push <filename>
+./client <server_ip> <port> <client_id> pull <filename>
+./client <server_ip> <port> <client_id> status
+./client <server_ip> <port> <client_id> done
+
+
+Example commands:
+
+./client 127.0.0.1 8080 client1 status
+./client 127.0.0.1 8080 client1 pull notes.txt
+./client 127.0.0.1 8080 client2 pull notes.txt
+./client 127.0.0.1 8080 client1 push notes.txt
+./client 127.0.0.1 8080 client1 done
+
+
+
+
+Usage Guidelines
+
+Pull Operation
+The pull command is used when a client wants to download a file from the server.
+During a pull operation, the server first checks whether the requested file exists in the server_files/ directory. It then checks whether the file is currently locked by another client. If the file is available, the server locks it for the requesting client and sends the file to the client. The client receives the file and stores it inside the client_files/ directory. This lock prevents other clients from pulling the same file while the first client is working on it.
+Command:
+./client 127.0.0.1 8080 client1 pull report.txt
+
+
+Push Operation
+The push command is used when a client wants to upload a file to the server.
+For a new file, the server accepts the upload and stores it in the server_files/ directory. For an existing file, the server accepts the update only if the same client previously pulled and locked that file. After a successful push, the server updates the stored file and releases the lock, making the file available to other clients again. This prevents one client from overwriting another client’s changes without first obtaining the lock.
+Command:
+./client 127.0.0.1 8080 client1 push report.txt
+
+
+Status Operation
+The status command is used to view the current state of files on the server.
+During a status operation, the server scans the server_files/ directory and displays the available files. For each file, the server shows whether it is available or locked, which client currently holds the lock if applicable, and the latest tracked file size. This command helps users see which files can be pulled and which files are currently being edited by another client.
+Command:
+./client 127.0.0.1 8080 client1 status
+
+
+Done Operation
+The done command is used when a client wants to release its current file locks without pushing an updated file.
+When the server receives this command, it finds all files currently locked by that client, releases those locks, marks the files as available again, and sends a confirmation response back to the client. This is useful when a client pulls a file but decides not to make or upload changes.
+Command:
+./client 127.0.0.1 8080 client1 done
+	
+
+
+
+Example Test Sequence
+
+
+First, start the server:
+
+
+./server 8080
+
+
+Then, check the available files:
+
+
+./client 127.0.0.1 8080 client1 status
+
+
+Pull and lock a file:
+
+
+./client 127.0.0.1 8080 client1 pull notes.txt
+
+
+Check that the file is locked:
+
+
+./client 127.0.0.1 8080 client2 status
+
+
+Try pulling the locked file from another client:
+
+
+./client 127.0.0.1 8080 client2 pull notes.txt
+
+
+The second client should receive an error because the file is locked by client1.
+
+
+Release the lock:
+
+
+./client 127.0.0.1 8080 client1 done
+
+
+Check that the file is available again:
+
+
+./client 127.0.0.1 8080 client1 status
+
+
+To test pushing a new file, place the file inside client_files/ and run:
+
+
+./client 127.0.0.1 8080 client1 push newfile.txt
+
+
+
+Limitations
+
+The server stores metadata in memory during runtime. This means lock information is maintained while the server is running, but it is not permanently saved after the server exits. The project is designed as a simplified file synchronization system for demonstrating socket communication, file transfer, and locking behavior, rather than a full production-level cloud storage system.
+
+
+
+Conclusion
+
+FileSync demonstrates a simplified client-server file synchronization system using TCP sockets in C. The project supports file upload, file download, file status checking, and lock release while preventing conflicting edits through server-side metadata and file locking.
