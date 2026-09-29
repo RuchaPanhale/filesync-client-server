@@ -1,10 +1,34 @@
 # FileSync - Client-Server File Synchronization System
 
+## Project Background & Team
+
+This repository is my portfolio copy of FileSync, developed by Rucha Panhale, Dorin Flocos, and Max Argenson for CS 551: Systems Programming at Binghamton University from February to May 2026.
+
+Original team repository and development history: [dfl0/filesync](https://github.com/dfl0/filesync)
+
+My contributions in the original repository appear under [Rucha414](https://github.com/Rucha414), my university-associated GitHub account.
+
+This portfolio copy was uploaded separately and does not preserve the original team's commit history.
+
+### My Contributions — Rucha Panhale
+
+- Implemented client-side TCP socket communication.
+- Developed push/pull file transfer functionality and upload/download handling.
+- Implemented client-side status and done commands, command validation, and error handling.
+- Tested client commands and verified integration with the server protocol.
+- Contributed to project documentation and integration testing.
+
+### Teammates' Contributions
+
+- **Dorin Flocos:** Server-side communication, request handling, server architecture, and socket integration.
+- **Max Argenson:** Metadata management, file-locking mechanisms, lock ownership tracking, and file state management.
+- **All team members:** Project documentation and integration testing.
+
 ## Overview
 
 FileSync is a client-server based file synchronization system implemented in C. It allows clients to push and pull files from a centralized server while preventing conflicting edits through a file-locking mechanism.
 
-When a client pulls a file, the server temporarily locks that file so that another client cannot pull or edit it at the same time. The lock is released when the client pushes the updated file back or uses the `done` command.
+When a client pulls a file, the server locks it for that client. Other clients cannot pull the file or upload changes to it while the lock is held. The lock is released after a successful upload or when the owning client uses the `done` command.
 
 This project demonstrates core systems programming concepts such as socket programming, file I/O, TCP-based client-server communication, command parsing, metadata management, and file synchronization.
 
