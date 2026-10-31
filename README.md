@@ -17,7 +17,7 @@ This portfolio copy was uploaded separately and does not preserve the original t
 - Implemented client-side status and done commands, command validation, and error handling.
 - Tested client commands and verified integration with the server protocol.
 - Contributed to project documentation and integration testing.
-
+- Conducted independent post-project performance benchmarking and SHA-256 integrity verification for binary file transfers up to 100 MiB.
 ### Teammates' Contributions
 
 - **Dorin Flocos:** Server-side communication, request handling, server architecture, and socket integration.
@@ -28,7 +28,7 @@ This portfolio copy was uploaded separately and does not preserve the original t
 
 FileSync is a client-server based file synchronization system implemented in C. It allows clients to push and pull files from a centralized server while preventing conflicting edits through a file-locking mechanism.
 
-When a client pulls a file, the server locks it for that client. Other clients cannot pull the file or upload changes to it while the lock is held. The lock is released after a successful upload or when the owning client uses the `done` command.
+When a client pulls a file, the server locks it for that client. Other clients cannot pull the locked file or overwrite its server copy while another client holds the lock. The lock is released after a successful upload or when the owning client uses the `done` command.
 
 This project demonstrates core systems programming concepts such as socket programming, file I/O, TCP-based client-server communication, command parsing, metadata management, and file synchronization.
 
@@ -40,7 +40,8 @@ This project demonstrates core systems programming concepts such as socket progr
 - File-locking mechanism to prevent conflicting edits
 - Status command to view file availability and lock state
 - Done command to release locks
-- Chunk-based file transfer
+- Upload new files directly without requiring a prior pull
+- Buffered binary file transfers using 1 KiB chunks
 - Error handling for invalid commands, missing files, and locked files
 - Makefile-based build system
 
@@ -53,6 +54,7 @@ file_sync/
 ├── common.h
 ├── Makefile
 ├── README.md
+├── TEST_RESULTS.md
 ├── file_sync_report.txt
 ├── client_files/
 └── server_files/
@@ -71,6 +73,7 @@ Remove compiled files using:
 ```bash
 make clean
 ```
+The project requires a C compiler (GCC or Clang), Make, and a POSIX-compatible environment such as macOS or Linux.
 
 ## Running the Project
 
@@ -186,6 +189,7 @@ Try pulling the same locked file:
 ```bash
 ./client 127.0.0.1 8080 client2 pull notes.txt
 ```
+Expected result: The server rejects the request because `notes.txt` is locked by `client1`.
 
 Release the lock:
 
@@ -211,6 +215,8 @@ Check that the file is available again:
 - Command-line interface design
 - Error handling and debugging
 - Makefile usage
+- Binary file-transfer integrity verification using SHA-256
+- Localhost performance benchmarking
 
 ## Notes
 
@@ -220,3 +226,23 @@ Check that the file is available again:
 - The server maintains metadata for lock status, lock ownership, and file size.
 - Existing files can only be updated by the client that currently holds the lock.
 - New files can be pushed directly from the client to the server.
+- File-lock metadata is maintained in memory and is reset when the server restarts.
+
+
+---
+
+## Performance and Integrity Testing
+
+FileSync was additionally tested with binary files of 1 MiB, 10 MiB, and 100 MiB, with matching SHA-256 checksums confirming transfer integrity.
+
+In three-run localhost benchmarks using 100 MiB files, the system achieved:
+
+- **Average upload throughput:** 365.9 MiB/s
+- **Average download throughput:** 337.1 MiB/s
+- **Largest verified transfer:** 100 MiB (104.86 MB)
+- **Transfer buffer:** 1 KiB
+
+These results were measured locally on an Apple M2 MacBook Pro and represent application-level localhost performance.
+
+For the complete testing methodology, benchmark results, and limitations, see [Performance and Integrity Test Results](TEST_RESULTS.md).
+
