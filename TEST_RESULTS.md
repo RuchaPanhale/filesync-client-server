@@ -169,17 +169,76 @@ The server processes incoming client connections sequentially; these tests verif
 
 ---
 
-## 4. Limitations
+## 4. Bug Fix: Intermittent Download Corruption
 
-- All performance measurements were performed locally on one Apple MacBook Pro rather than across separate physical machines.
-- Localhost throughput may benefit from operating-system caching and local memory or storage performance.
-- System load and hardware characteristics may affect the measured transfer times.
-- Each operation was timed three times, providing preliminary benchmark results rather than a comprehensive performance study.
-- The server processes client connections sequentially. Parallel multi-client transfer throughput was not benchmarked.
-- Interrupted-transfer recovery and automatic retry behavior were not formally evaluated.
-- SHA-256 checksums were compared manually after file transfers; integrity verification is not built into the FileSync application.
-- File-lock metadata is stored in memory and is not preserved after the server restarts.
-- Large binary test files were generated locally and are not included in this repository.
+**Found:** November 2026, during post-project code review.
+
+**Symptom:** PULL could save an incomplete file while still printing "Download complete."
+
+**Root cause:** The server sent the `OK <filesize>` header and the file data back-to-back on the same TCP stream, with no delimiter after the header. The client read the header with a single `recv()` of up to 1,023 bytes, so when file data had already arrived, the first part of the file was consumed as part of the header and never written to disk. The client also ignored the return value of `receive_file()`, so the failure was silent.
+
+**Why earlier tests passed:** On localhost (M2 Mac), the header usually arrived alone before any file data, so the bug did not appear in normal runs. It appears when the client reads more slowly than the server sends, for example under network latency or system load.
+
+**Reproduction (fault injection):** A temporary 200 ms delay (`usleep(200000)`) was added before the client reads the server's response to simulate a slow network. Each file was pulled 20 times and compared against a preserved original using `cmp`.
+
+| File Size | Before Fix (200 ms delay) | After Fix (200 ms delay) |
+|---|---|---|
+| 1 MiB | 20/20 corrupted | 0/20 corrupted |
+| 10 MiB | 20/20 corrupted | 0/20 corrupted |
+| 100 MiB | 20/20 corrupted | 0/20 corrupted |
+
+The delay was removed after verification.
+
+**Fix:**
+- The server now ends the PULL header with a newline (`OK <filesize>\n`).
+- The client reads the header with `recv_line()`, one byte at a time up to the newline, so it never consumes file data.
+- The client checks the return values of `send()` and `receive_file()` and reports a failed download instead of printing "Download complete."
+- `recv_line()` now returns a partial line if the connection closes, so server `ERROR` messages without a trailing newline still reach the client. (This regression was found while testing the fix.)
+
+---
+
+## 5. Security Fix: Path Traversal
+
+**Found:** November 2026, during post-project code review.
+
+**Issue:** The server built file paths by appending the client-supplied filename to `server_files/` without validation. A request such as `PULL attacker ../../secret_test.txt` read a file outside the server directory, and a PUSH with `../evil.txt` could write outside it.
+
+**Verification:**
+
+| Test | Before Fix | After Fix |
+|---|---|---|
+| PULL `../../secret_test.txt` (raw socket request) | File contents returned | `ERROR invalid filename` |
+| PUSH `../evil.txt` (raw socket request) | Not tested before fix | `ERROR invalid filename`, no file written |
+| Normal PULL/DONE | Worked | Worked |
+
+**Fix:** Added `is_safe_filename()` to the server, which rejects empty names, names containing `/`, and the special names `.` and `..`. It is checked at the start of both PULL and PUSH handling.
+
+---
+
+## Re-run Benchmark After Fixes
+
+After both fixes, the 100 MiB benchmark was re-run with 10 PULL/PUSH cycles, timed with Python's `time.perf_counter()`:
+
+| Metric | PULL | PUSH |
+|---|---:|---:|
+| Average time | 0.221 s | 0.241 s |
+| Average throughput | **453.3 MiB/s** | **415.6 MiB/s** |
+
+SHA-256 checksums of the original, downloaded and server copies matched. These numbers are higher than the earlier 3-run results mainly because of the different timing method and OS file caching, not because the fixes improved speed.
+
+---
+
+## 6. Limitations
+
+**Testing scope**
+- All benchmarks ran on a single M2 MacBook Pro over localhost, so results reflect OS caching and local hardware rather than real network bandwidth.
+- Parallel multi-client throughput and interrupted-transfer recovery were not tested; the server handles connections sequentially.
+- SHA-256 integrity checks were run manually and are not built into the application. Large test files are not included in this repository.
+
+**Known design issues (identified, not fixed)**
+- Lock state is kept in memory and lost on server restart; locks never expire if a client disconnects without sending DONE.
+- Client IDs are self-declared with no authentication, so any client can release another client's locks.
+- An interrupted PUSH can leave a partial file on the server, and a rejected PUSH still transmits the full file before reading the error.
 
 ---
 

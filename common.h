@@ -63,8 +63,13 @@ static inline int recv_line(int sockfd, char *buf, size_t maxlen)
         char c;
 
         int n = recv(sockfd, &c, 1, 0);
-        if (n <= 0)
+        if (n < 0)
             return -1;
+        if (n == 0) {            // connection closed
+            if (i == 0)
+                return -1;       // nothing received at all
+            break;               // return the partial line (an ERROR msg)
+        }
         if (c == '\n')
             break;
 

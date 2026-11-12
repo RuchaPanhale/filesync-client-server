@@ -8,3 +8,6 @@ test_server
 
 # macOS system files
 .DS_Store
+
+# Large binary test files
+*.bin

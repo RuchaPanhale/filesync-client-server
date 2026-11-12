@@ -280,10 +280,32 @@ void handle_status(int client_fd)
     send(client_fd, status_msg, strlen(status_msg), 0);
 }
 
+/*
+ * Reject filenames that could escape server_files/ (path traversal),
+ * e.g. "../../secret.txt" or "/etc/passwd".
+ * Returns 1 if the name is safe, 0 otherwise.
+ */
+int is_safe_filename(const char *filename)
+{
+    if (filename[0] == '\0')
+        return 0;
+    if (strchr(filename, '/') != NULL)
+        return 0;
+    if (strcmp(filename, ".") == 0 || strcmp(filename, "..") == 0)
+        return 0;
+    return 1;
+}
+
 void handle_pull(int client_fd, char *client_id, char *filename)
 {
     printf("Client %s requested pull: %s\n",
            client_id, filename);
+    
+    if (!is_safe_filename(filename)) {
+        char *msg = "ERROR invalid filename";
+        send(client_fd, msg, strlen(msg), 0);
+        return;
+    }
 
     char filepath[256];
     build_server_filepath(filepath, sizeof(filepath), filename);
@@ -330,7 +352,7 @@ void handle_pull(int client_fd, char *client_id, char *filename)
     }
 
     char response[64];
-    snprintf(response, sizeof(response), "OK %ld", filesize);
+    snprintf(response, sizeof(response), "OK %ld\n", filesize);
 
     send(client_fd, response, strlen(response), 0);
 
@@ -348,6 +370,13 @@ void handle_push(int client_fd, char *client_id, char *filename, long filesize)
 {
     printf("Client %s pushing file %s (%ld bytes)\n",
            client_id, filename, filesize);
+
+    
+    if (!is_safe_filename(filename)) {
+        char *msg = "ERROR invalid filename";
+        send(client_fd, msg, strlen(msg), 0);
+        return;
+    }
 
     // push is only valid if this same client previously pulled and locked the file
     // OR if the file does not exist on the server yet

@@ -129,9 +129,13 @@ int main(int argc, char *argv[]) {
     else if (strcmp(command, "pull") == 0) {
         snprintf(request, sizeof(request), "PULL %s %s\n", client_id, filename);
 
-        send(sockfd, request, strlen(request), 0);
+        if (send(sockfd, request, strlen(request), 0) < 0) {
+            perror("Failed to send pull request");
+            close(sockfd);
+            return 1;
+        }
 
-        if (receive_response(sockfd, response) < 0) {
+        if (recv_line(sockfd, response, BUFSIZE) < 0) {
             close(sockfd);
             return 1;
         }
@@ -156,7 +160,11 @@ int main(int argc, char *argv[]) {
 
         printf("Downloading %s (%ld bytes)\n", filename, filesize);
 
-        receive_file(sockfd, filepath, filesize);
+        if (receive_file(sockfd, filepath, filesize) < 0) {
+            printf("Download failed: connection closed before all %ld bytes arrived.\n", filesize);
+            close(sockfd);
+            return 1;
+        }
 
         printf("Download complete.\n");
     }
