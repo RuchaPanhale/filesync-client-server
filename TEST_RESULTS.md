@@ -7,11 +7,13 @@ This document presents additional performance and file-integrity testing conduct
 
 The objective was to evaluate FileSync's ability to transfer binary files of increasing sizes using chunked file transfers, verify data integrity using SHA-256 checksums, and measure approximate upload and download throughput.
 
-**Test date:** October 31, 2026  
+Post-project review also uncovered and fixed a download-corruption bug and a path-traversal vulnerability (Sections 4 and 5).
+
+**Test dates:** October 31, 2026 (initial tests); November 11, 2026 (bug fix, security fix, and re-run)  
 **Environment:** Apple MacBook Pro (M2), macOS; client and server running locally over `127.0.0.1` (localhost)  
 **Transfer buffer:** 1,024 bytes (1 KiB)  
 **Integrity verification:** SHA-256 checksums  
-**Benchmark method:** `/usr/bin/time -p`
+**Benchmark method:** `/usr/bin/time -p` (initial, 3 runs); Python `time.perf_counter()` (re-run, 10 runs)  
 
 ---
 
@@ -140,6 +142,17 @@ For an existing file, the client must first acquire its lock through PULL before
 
 Repeated PULL measurements require releasing the previous lock using DONE or completing an authorized PUSH.
 
+### Re-run After Fixes
+
+After both fixes, the 100 MiB benchmark was re-run with 10 PULL/PUSH cycles, timed with Python's `time.perf_counter()`:
+
+| Metric | PULL | PUSH |
+|---|---:|---:|
+| Average time | 0.221 s | 0.241 s |
+| Average throughput | **453.3 MiB/s** | **415.6 MiB/s** |
+
+SHA-256 checksums of the original, downloaded and server copies matched. These numbers are higher than the earlier 3-run results mainly because of the different timing method and OS file caching, not because the fixes improved speed.
+
 ---
 
 ## 3. File Locking and Status Verification
@@ -215,19 +228,6 @@ The delay was removed after verification.
 
 ---
 
-## Re-run Benchmark After Fixes
-
-After both fixes, the 100 MiB benchmark was re-run with 10 PULL/PUSH cycles, timed with Python's `time.perf_counter()`:
-
-| Metric | PULL | PUSH |
-|---|---:|---:|
-| Average time | 0.221 s | 0.241 s |
-| Average throughput | **453.3 MiB/s** | **415.6 MiB/s** |
-
-SHA-256 checksums of the original, downloaded and server copies matched. These numbers are higher than the earlier 3-run results mainly because of the different timing method and OS file caching, not because the fixes improved speed.
-
----
-
 ## 6. Limitations
 
 **Testing scope**
@@ -244,11 +244,13 @@ SHA-256 checksums of the original, downloaded and server copies matched. These n
 
 ## Conclusion
 
-FileSync successfully transferred binary files of 1 MiB, 10 MiB, and 100 MiB in both directions, with matching SHA-256 checksums providing evidence of data integrity.
+FileSync transferred 1 MiB, 10 MiB, and 100 MiB binary files in both directions with matching SHA-256 checksums.
 
-In three-run localhost benchmarks using 100 MiB files, the system achieved average application-level throughput of approximately:
+Post-project testing found a timing-dependent download-corruption bug (60/60 downloads corrupted under 200 ms simulated latency) and a path-traversal vulnerability. Both were fixed and verified: 0/60 downloads corrupted, and traversal requests are rejected.
 
-- **365.9 MiB/s for uploads (PUSH)**
-- **337.1 MiB/s for downloads (PULL)**
+After the fixes, 10-run localhost benchmarks with 100 MiB files measured approximately:
 
-These tests demonstrate successful binary file transfers with verified data integrity and provide baseline localhost performance measurements. Results may vary depending on hardware, operating-system caching, and system load.
+- **453.3 MiB/s for downloads (PULL)**
+- **415.6 MiB/s for uploads (PUSH)**
+
+These results reflect localhost performance on one machine and may vary with hardware, operating-system caching, and system load.
